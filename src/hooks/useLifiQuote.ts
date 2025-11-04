@@ -227,7 +227,7 @@ export function useLifiQuote() {
 				toChain: parseInt(params.toChain),
 				fromToken: params.fromToken,
 				toToken: params.toToken,
-				fromAmount: params.fromAmount, // Use toAmount for contract calls quote
+				toAmount: minReceiveAmount, // CRITICAL: Must use toAmount for contract calls
 				contractCalls,
 			} as ContractCallsQuoteRequest);
 

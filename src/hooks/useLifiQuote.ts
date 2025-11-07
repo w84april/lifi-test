@@ -4,11 +4,8 @@ import {
 	getQuote,
 	type QuoteRequest,
 } from "@lifi/sdk";
-import {
-	sendTransaction,
-	switchChain as wagmiSwitchChain,
-	waitForTransactionReceipt,
-} from "@wagmi/core";
+import { sendTransaction, waitForTransactionReceipt } from "@wagmi/core";
+import { toBigInt } from "ethers";
 import { useState } from "react";
 import { type Address, encodeFunctionData } from "viem";
 import { useAccount, useSwitchChain, useWalletClient } from "wagmi";
@@ -28,6 +25,8 @@ interface UseLifiQuoteParams {
 	contractCallData?: string;
 	stakingMethod?: string; // For custom staking methods
 	depositMethod?: "yearnV2" | "yearnV2NoRecipient" | "yearnV3"; // Deposit method type
+	stakingAddress?: string; // For staking after vault deposit
+	stakingFlow?: boolean; // Flag to enable vault + staking flow
 }
 
 export function useLifiQuote() {
@@ -42,7 +41,7 @@ export function useLifiQuote() {
 		useContractCallsDebugger();
 	const { analyzeQuoteFailure, checkContractCallsSupport, validateAmounts } =
 		useLifiContractCallsAnalyzer();
-
+	const executor = "0xd9b2da9c45b118e4e93a004fb1452bcdb6cc0e88";
 	const fetchQuote = async (params: UseLifiQuoteParams) => {
 		console.log(params);
 		if (!address) {
@@ -160,7 +159,7 @@ export function useLifiQuote() {
 								},
 							],
 							functionName: "deposit",
-							args: [BigInt(minReceiveAmount), address as Address],
+							args: [BigInt(minReceiveAmount), executor as Address],
 						});
 						break;
 					default:
@@ -178,7 +177,7 @@ export function useLifiQuote() {
 								},
 							],
 							functionName: "deposit",
-							args: [BigInt(minReceiveAmount), address as Address],
+							args: [BigInt(minReceiveAmount), executor as Address],
 						});
 				}
 			}
@@ -197,6 +196,92 @@ export function useLifiQuote() {
 				toContractCallData: contractCallData,
 				toContractGasLimit: "500000", // Increased gas limit for deposit operations
 			});
+
+			// If staking flow is enabled, add approve and stake calls
+			if (params.stakingFlow && params.stakingAddress) {
+				console.log("Adding staking flow contract calls");
+
+				// Calculate vault tokens using convertToShares
+				let vaultTokenAmount: bigint;
+				try {
+					// Call convertToShares on the vault contract
+					const { readContract } = await import("@wagmi/core");
+					vaultTokenAmount = await readContract(wagmiConfig, {
+						address: params.contractAddress as Address,
+						abi: [
+							{
+								name: "convertToShares",
+								type: "function",
+								inputs: [{ name: "assets", type: "uint256" }],
+								outputs: [{ name: "shares", type: "uint256" }],
+							},
+						],
+						functionName: "convertToShares",
+						args: [BigInt(minReceiveAmount)],
+						chainId: parseInt(params.toChain) as 1 | 10 | 137 | 42161 | 8453,
+					});
+					console.log(
+						`Converted ${minReceiveAmount} assets to ${vaultTokenAmount} shares`,
+					);
+				} catch (error) {
+					console.warn(
+						"Failed to call convertToShares, using 90% of deposit amount as fallback:",
+						error,
+					);
+					// Fallback: assume 90% efficiency for safety
+					vaultTokenAmount = (toBigInt(minReceiveAmount) * 9n) / 10n;
+				}
+
+				// 3. Approve vault tokens to staking contract
+				const approveVaultTokensData = encodeFunctionData({
+					abi: [
+						{
+							name: "approve",
+							type: "function",
+							inputs: [
+								{ name: "spender", type: "address" },
+								{ name: "amount", type: "uint256" },
+							],
+							outputs: [{ name: "", type: "bool" }],
+						},
+					],
+					functionName: "approve",
+					args: [params.stakingAddress as Address, BigInt(vaultTokenAmount)],
+				});
+
+				contractCalls.push({
+					fromAmount: vaultTokenAmount.toString(), //test
+					fromTokenAddress: params.contractAddress, // Vault contract is the vault token
+					toContractAddress: params.stakingAddress, // Approve on vault token contract
+					toContractCallData: approveVaultTokensData,
+					toContractGasLimit: "150000",
+				});
+
+				// 4. Deposit vault tokens into staking contract
+				const stakingCallData = encodeFunctionData({
+					abi: [
+						{
+							name: "deposit",
+							type: "function",
+							inputs: [
+								{ name: "amount", type: "uint256" },
+								{ name: "receiver", type: "address" },
+							],
+							outputs: [],
+						},
+					],
+					functionName: "deposit",
+					args: [BigInt(vaultTokenAmount), address as Address],
+				});
+
+				contractCalls.push({
+					fromAmount: vaultTokenAmount.toString(),
+					fromTokenAddress: params.contractAddress, // Vault token
+					toContractAddress: params.stakingAddress, // Staking contract
+					toContractCallData: stakingCallData,
+					toContractGasLimit: "500000",
+				});
+			}
 
 			console.log("Contract calls array:", contractCalls);
 			console.log("Quote request params:", {
@@ -227,7 +312,8 @@ export function useLifiQuote() {
 				toChain: parseInt(params.toChain),
 				fromToken: params.fromToken,
 				toToken: params.toToken,
-				toAmount: minReceiveAmount, // CRITICAL: Must use toAmount for contract calls
+				fromAmount: params.fromAmount,
+				// toAmount: minReceiveAmount,
 				contractCalls,
 			} as ContractCallsQuoteRequest);
 

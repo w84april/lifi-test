@@ -45,7 +45,7 @@ export function useContractCallsDebugger() {
   const validateContractCalls = (params: ContractCallsQuoteRequest & { contractCalls: any[] }) => {
     console.log("=== Validating Contract Calls ===");
     
-    const errors = [];
+    const errors: string[] = [];
     
     // Validate contract calls structure
     params.contractCalls.forEach((call, index) => {

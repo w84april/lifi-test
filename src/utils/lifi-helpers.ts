@@ -1,6 +1,6 @@
-import { executeRoute as lifiExecuteRoute, Route } from '@lifi/sdk';
-import { WalletClient } from 'viem';
-import { providers } from 'ethers';
+import { executeRoute as lifiExecuteRoute, type Route } from '@lifi/sdk';
+import type { WalletClient } from 'viem';
+import { JsonRpcProvider } from 'ethers';
 
 // Helper to convert viem wallet client to ethers signer
 export function walletClientToSigner(walletClient: WalletClient) {
@@ -16,7 +16,7 @@ export function walletClientToSigner(walletClient: WalletClient) {
     ensAddress: chain.contracts?.ensRegistry?.address,
   };
   
-  const provider = new providers.JsonRpcProvider(
+  const provider = new JsonRpcProvider(
     transport.url || `https://rpc.ankr.com/eth`, 
     network
   );

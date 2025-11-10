@@ -1,4 +1,4 @@
-import { decodeAbiParameters, decodeFunctionData, type Hex } from "viem";
+import { decodeFunctionData, type Hex } from "viem";
 
 // Common LiFi contract ABIs
 const LIFI_DIAMOND_ABI = [

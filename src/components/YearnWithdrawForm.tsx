@@ -3,7 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import "./Forms.css";
 import type { Address } from "viem";
 import { useAccount } from "wagmi";
-import { useLifiQuote } from "../hooks/useLifiQuote";
+import { useLifiWithdraw } from "../hooks/useLifiWithdraw";
 import { useTokenApproval } from "../hooks/useTokenApproval";
 import {
 	useVaultTypeDetector,
@@ -14,20 +14,19 @@ import { parseUnits, TOKEN_DECIMALS } from "../utils/tokenHelpers";
 interface FormData {
 	fromChain: string;
 	toChain: string;
-	fromToken: string;
-	toToken: string;
-	fromAmount: string;
 	yearnVaultAddress: string;
-	stakingAddress: string;
+	vaultUnderlyingAsset: string;
+	toToken: string;
+	toTokenAmount: string; // Amount of final token user wants to receive
 	userAddress: string;
-	depositMethod: "yearnV2" | "yearnV2NoRecipient" | "yearnV3";
+	withdrawMethod: "yearnV2" | "yearnV2NoRecipient" | "yearnV3";
 }
 
-const StakingDepositForm = () => {
+const YearnWithdrawForm = () => {
 	const [quote, setQuote] = useState<any>(null);
 	const { address, isConnected } = useAccount();
-	const { loading, executing, error, fetchQuote, executeQuote } =
-		useLifiQuote();
+	const { loading, executing, error, fetchWithdrawQuote, executeQuote } =
+		useLifiWithdraw();
 	const [detectedVaultType, setDetectedVaultType] = useState<VaultType | null>(
 		null,
 	);
@@ -41,17 +40,16 @@ const StakingDepositForm = () => {
 	const [formData, setFormData] = useState<FormData>({
 		fromChain: "1",
 		toChain: "1",
-		fromToken: "",
-		toToken: "",
-		fromAmount: "",
 		yearnVaultAddress: "",
-		stakingAddress: "",
+		vaultUnderlyingAsset: "",
+		toToken: "",
+		toTokenAmount: "",
 		userAddress: address || "",
-		depositMethod: "yearnV2",
+		withdrawMethod: "yearnV2",
 	});
 
 	const { detecting, detectVaultType } = useVaultTypeDetector(
-		parseInt(formData.toChain),
+		parseInt(formData.fromChain),
 	);
 
 	useEffect(() => {
@@ -74,26 +72,24 @@ const StakingDepositForm = () => {
 		try {
 			// Configure LiFi SDK
 			createConfig({
-				integrator: "staking-yearn-lifi-zap",
+				integrator: "yearn-withdraw-lifi-zap",
 			});
 
-			// Fetch quote using our hook with staking flow enabled
-			const contractCallsQuote = await fetchQuote({
+			// Fetch withdrawal quote using our hook
+			const contractCallsQuote = await fetchWithdrawQuote({
 				fromChain: formData.fromChain,
 				toChain: formData.toChain,
-				fromToken: formData.fromToken,
+				yearnVaultAddress: formData.yearnVaultAddress,
+				vaultUnderlyingAsset: formData.vaultUnderlyingAsset,
 				toToken: formData.toToken,
-				fromAmount: formData.fromAmount,
-				contractAddress: formData.yearnVaultAddress,
-				depositMethod: formData.depositMethod,
-				stakingAddress: formData.stakingAddress,
-				stakingFlow: true, // Enable the vault + staking flow
+				toTokenAmount: formData.toTokenAmount,
+				withdrawMethod: formData.withdrawMethod,
 			});
 
 			// Store LiFi contract address from the quote
 			const txData =
 				contractCallsQuote?.transactionRequest ||
-				(contractCallsQuote as any)?.estimate?.transactionRequest;
+				(contractCallsQuote?.estimate as any)?.transactionRequest;
 			if (txData?.to) {
 				setLifiContractAddress(txData.to);
 			}
@@ -120,9 +116,9 @@ const StakingDepositForm = () => {
 
 	return (
 		<div className="form-container">
-			<h2>Yearn Vault + Staking via LiFi</h2>
+			<h2>Withdraw from Yearn via LiFi</h2>
 			<p style={{ marginBottom: "20px", color: "#666", fontSize: "14px" }}>
-				This will: Swap → Deposit to Yearn → Stake vault tokens
+				This will: Calculate required vault shares → Withdraw from vault → Swap to get exact output amount
 			</p>
 			<form onSubmit={handleSubmit}>
 				<div className="form-group">
@@ -166,98 +162,6 @@ const StakingDepositForm = () => {
 					</div>
 				</div>
 
-				<div className="form-row">
-					<div className="form-group">
-						<label htmlFor="fromToken">From Token Address</label>
-						<input
-							type="text"
-							id="fromToken"
-							name="fromToken"
-							value={formData.fromToken}
-							onChange={handleInputChange}
-							placeholder="0x..."
-							required
-						/>
-					</div>
-					<div className="form-group">
-						<label htmlFor="toToken">To Token Address</label>
-						<input
-							type="text"
-							id="toToken"
-							name="toToken"
-							value={formData.toToken}
-							onChange={handleInputChange}
-							placeholder="0x..."
-							required
-						/>
-					</div>
-				</div>
-
-				<div className="form-group">
-					<label htmlFor="fromAmount">
-						Amount
-						<button
-							type="button"
-							onClick={() => setUseRawInput(!useRawInput)}
-							style={{
-								marginLeft: "10px",
-								padding: "2px 8px",
-								fontSize: "12px",
-								borderRadius: "4px",
-								border: "1px solid #ccc",
-								background: "#f5f5f5",
-								cursor: "pointer",
-							}}
-						>
-							{useRawInput ? "Switch to Human" : "Switch to Raw"}
-						</button>
-					</label>
-					{useRawInput ? (
-						<>
-							<input
-								type="text"
-								id="fromAmount"
-								name="fromAmount"
-								value={formData.fromAmount}
-								onChange={handleInputChange}
-								placeholder="1000000000000000000"
-								required
-							/>
-							<small
-								style={{ color: "#666", display: "block", marginTop: "4px" }}
-							>
-								Enter amount in token's smallest unit (e.g., 1 ETH =
-								1000000000000000000 wei)
-							</small>
-						</>
-					) : (
-						<>
-							<input
-								type="text"
-								id="humanAmount"
-								name="humanAmount"
-								value={humanAmount}
-								onChange={(e) => {
-									setHumanAmount(e.target.value);
-									// Auto-convert to raw amount
-									const decimals =
-										TOKEN_DECIMALS[formData.fromToken.toLowerCase()] || 18;
-									const rawAmount = parseUnits(e.target.value, decimals);
-									setFormData((prev) => ({ ...prev, fromAmount: rawAmount }));
-								}}
-								placeholder="1.0"
-								required
-							/>
-							<small
-								style={{ color: "#666", display: "block", marginTop: "4px" }}
-							>
-								Enter human-readable amount (e.g., 1.5 for 1.5 tokens)
-								{formData.fromAmount && ` = ${formData.fromAmount} raw`}
-							</small>
-						</>
-					)}
-				</div>
-
 				<div className="form-group">
 					<label htmlFor="yearnVaultAddress">Yearn Vault Address</label>
 					<div style={{ display: "flex", gap: "10px" }}>
@@ -282,7 +186,7 @@ const StakingDepositForm = () => {
 									if (vaultType !== "unknown") {
 										setFormData((prev) => ({
 											...prev,
-											depositMethod: vaultType as any,
+											withdrawMethod: vaultType as any,
 										}));
 									}
 								}
@@ -307,27 +211,107 @@ const StakingDepositForm = () => {
 				</div>
 
 				<div className="form-group">
-					<label htmlFor="stakingAddress">Staking Contract Address</label>
+					<label htmlFor="vaultUnderlyingAsset">Vault Underlying Asset</label>
 					<input
 						type="text"
-						id="stakingAddress"
-						name="stakingAddress"
-						value={formData.stakingAddress}
+						id="vaultUnderlyingAsset"
+						name="vaultUnderlyingAsset"
+						value={formData.vaultUnderlyingAsset}
 						onChange={handleInputChange}
 						placeholder="0x..."
 						required
 					/>
 					<small style={{ color: "#666", display: "block", marginTop: "4px" }}>
-						The staking contract where vault tokens will be deposited
+						The underlying token that the vault holds (e.g., USDC, DAI, WETH)
 					</small>
 				</div>
 
 				<div className="form-group">
-					<label htmlFor="depositMethod">Deposit Method</label>
+					<label htmlFor="toToken">To Token Address</label>
+					<input
+						type="text"
+						id="toToken"
+						name="toToken"
+						value={formData.toToken}
+						onChange={handleInputChange}
+						placeholder="0x..."
+						required
+					/>
+					<small style={{ color: "#666", display: "block", marginTop: "4px" }}>
+						Token you want to receive after withdrawal and swap
+					</small>
+				</div>
+
+				<div className="form-group">
+					<label htmlFor="toTokenAmount">
+						Final Token Amount to Receive
+						<button
+							type="button"
+							onClick={() => setUseRawInput(!useRawInput)}
+							style={{
+								marginLeft: "10px",
+								padding: "2px 8px",
+								fontSize: "12px",
+								borderRadius: "4px",
+								border: "1px solid #ccc",
+								background: "#f5f5f5",
+								cursor: "pointer",
+							}}
+						>
+							{useRawInput ? "Switch to Human" : "Switch to Raw"}
+						</button>
+					</label>
+					{useRawInput ? (
+						<>
+							<input
+								type="text"
+								id="toTokenAmount"
+								name="toTokenAmount"
+								value={formData.toTokenAmount}
+								onChange={handleInputChange}
+								placeholder="1000000000000000000"
+								required
+							/>
+							<small
+								style={{ color: "#666", display: "block", marginTop: "4px" }}
+							>
+								Exact amount of {formData.toToken ? 'output token' : 'token'} you want to receive (raw units)
+							</small>
+						</>
+					) : (
+						<>
+							<input
+								type="text"
+								id="humanAmount"
+								name="humanAmount"
+								value={humanAmount}
+								onChange={(e) => {
+									setHumanAmount(e.target.value);
+									// Auto-convert to raw amount
+									const decimals =
+										TOKEN_DECIMALS[formData.toToken.toLowerCase()] || 18;
+									const rawAmount = parseUnits(e.target.value, decimals);
+									setFormData((prev) => ({ ...prev, toTokenAmount: rawAmount }));
+								}}
+								placeholder="1.0"
+								required
+							/>
+							<small
+								style={{ color: "#666", display: "block", marginTop: "4px" }}
+							>
+								Human-readable amount of final token to receive
+								{formData.toTokenAmount && ` = ${formData.toTokenAmount} raw`}
+							</small>
+						</>
+					)}
+				</div>
+
+				<div className="form-group">
+					<label htmlFor="withdrawMethod">Withdraw Method</label>
 					<select
-						id="depositMethod"
-						name="depositMethod"
-						value={formData.depositMethod}
+						id="withdrawMethod"
+						name="withdrawMethod"
+						value={formData.withdrawMethod}
 						onChange={handleInputChange}
 					>
 						<option value="yearnV2">Yearn V2 (with recipient)</option>
@@ -364,32 +348,30 @@ const StakingDepositForm = () => {
 					>
 						<strong>Contract Calls:</strong>
 						<ol style={{ margin: "10px 0", paddingLeft: "20px" }}>
-							<li>Approve {formData.toToken} to vault</li>
-							<li>Deposit to Yearn vault</li>
-							<li>Approve vault tokens to staking</li>
-							<li>Deposit vault tokens to staking</li>
+							<li>Withdraw from Yearn vault (receive underlying assets)</li>
+							<li>Approve underlying assets for swap</li>
+							<li>Swap underlying assets to {formData.toToken || 'desired token'}</li>
 						</ol>
 					</div>
-					{formData.fromToken &&
-						formData.fromToken !==
-							"0x0000000000000000000000000000000000000000" &&
+					{formData.yearnVaultAddress &&
 						lifiContractAddress && (
 							<button
 								type="button"
 								className="submit-button"
 								onClick={async () => {
 									try {
-										const amount = BigInt(formData.fromAmount);
+										// For withdrawals, we need to approve vault tokens (shares)
+										const sharesToWithdraw = quote?.estimate?.fromAmount || "0";
 										const result = await checkAndApproveIfNeeded(
-											formData.fromToken as Address,
+											formData.yearnVaultAddress as Address, // Vault tokens
 											address as Address,
 											quote.estimate.approvalAddress,
-											amount,
+											BigInt(sharesToWithdraw),
 											parseInt(formData.fromChain),
 										);
 
 										if (!result.needed) {
-											alert("Token already approved!");
+											alert("Vault tokens already approved!");
 										} else {
 											alert(`Approval successful! Hash: ${result.hash}`);
 										}
@@ -401,7 +383,7 @@ const StakingDepositForm = () => {
 								disabled={approving || !address}
 								style={{ marginRight: "10px" }}
 							>
-								{approving ? "Approving..." : "Approve Token"}
+								{approving ? "Approving..." : "Approve Vault Tokens"}
 							</button>
 						)}
 					<button
@@ -436,4 +418,4 @@ const StakingDepositForm = () => {
 	);
 };
 
-export default StakingDepositForm;
+export default YearnWithdrawForm;

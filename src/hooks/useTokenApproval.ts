@@ -1,6 +1,5 @@
 import { useState, useCallback } from "react";
-import { type Address, parseEther, maxUint256 } from "viem";
-import { usePublicClient, useWalletClient } from "wagmi";
+import { type Address, maxUint256 } from "viem";
 import { readContract, writeContract, waitForTransactionReceipt } from "@wagmi/core";
 import { config as wagmiConfig } from "../wagmi";
 
@@ -47,7 +46,7 @@ export function useTokenApproval() {
         abi: ERC20_ABI,
         functionName: "allowance",
         args: [owner, spender],
-        chainId,
+        chainId: chainId as 1 | 10 | 137 | 42161 | 8453 | undefined,
       });
 
       return allowance as bigint;
@@ -74,7 +73,7 @@ export function useTokenApproval() {
         token: tokenAddress,
         spender,
         amount: amount.toString(),
-        chainId,
+        chainId: chainId as 1 | 10 | 137 | 42161 | 8453 | undefined,
       });
 
       const hash = await writeContract(wagmiConfig, {
@@ -82,7 +81,7 @@ export function useTokenApproval() {
         abi: ERC20_ABI,
         functionName: "approve",
         args: [spender, amount],
-        chainId,
+        chainId: chainId as 1 | 10 | 137 | 42161 | 8453 | undefined,
       });
 
       console.log("Approval transaction hash:", hash);
@@ -90,7 +89,7 @@ export function useTokenApproval() {
       // Wait for confirmation
       const receipt = await waitForTransactionReceipt(wagmiConfig, {
         hash,
-        chainId,
+        chainId: chainId as 1 | 10 | 137 | 42161 | 8453 | undefined,
       });
 
       console.log("Approval receipt:", receipt);

@@ -88,7 +88,7 @@ export function useSimpleLifiQuote() {
 				value: txData.value ? BigInt(txData.value) : undefined,
 				gas: txData.gasLimit ? BigInt(txData.gasLimit) : undefined,
 				gasPrice: txData.gasPrice ? BigInt(txData.gasPrice) : undefined,
-				chainId: targetChainId,
+				chainId: targetChainId as 1 | 10 | 137 | 42161 | 8453,
 			});
 
 			console.log("Transaction sent:", hash);

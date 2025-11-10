@@ -206,7 +206,7 @@ export function useLifiQuote() {
 				try {
 					// Call convertToShares on the vault contract
 					const { readContract } = await import("@wagmi/core");
-					vaultTokenAmount = await readContract(wagmiConfig, {
+					vaultTokenAmount = (await readContract(wagmiConfig, {
 						address: params.contractAddress as Address,
 						abi: [
 							{
@@ -218,8 +218,8 @@ export function useLifiQuote() {
 						],
 						functionName: "convertToShares",
 						args: [BigInt(minReceiveAmount)],
-						chainId: parseInt(params.toChain) as 1 | 10 | 137 | 42161 | 8453,
-					});
+						chainId: parseInt(params.toChain) as any,
+					})) as bigint;
 					console.log(
 						`Converted ${minReceiveAmount} assets to ${vaultTokenAmount} shares`,
 					);
@@ -295,7 +295,7 @@ export function useLifiQuote() {
 			});
 
 			// Validate contract calls before sending
-			const validationErrors = validateContractCalls({
+			validateContractCalls({
 				fromAddress: address,
 				fromChain: parseInt(params.fromChain),
 				toChain: parseInt(params.toChain),
@@ -321,7 +321,7 @@ export function useLifiQuote() {
 			console.log(
 				"Transaction request:",
 				contractCallsQuote?.transactionRequest ||
-					contractCallsQuote?.estimate?.transactionRequest,
+					(contractCallsQuote as any)?.estimate?.transactionRequest,
 			);
 
 			// Debug the quote structure
@@ -355,7 +355,7 @@ export function useLifiQuote() {
 			// Extract the transaction data from the quote
 			// LiFi quotes have a transactionRequest property
 			const txData =
-				quote?.transactionRequest || quote?.estimate?.transactionRequest;
+				quote?.transactionRequest || (quote as any)?.transactionRequest || (quote as any)?.estimate?.transactionRequest;
 
 			if (!txData) {
 				console.error("No transaction data found in quote:", quote);
@@ -382,7 +382,7 @@ export function useLifiQuote() {
 			);
 			if (chainId !== targetChainId) {
 				console.log(`Switching from chain ${chainId} to ${targetChainId}`);
-				await switchChainAsync({ chainId: targetChainId });
+				await switchChainAsync({ chainId: targetChainId as 1 | 10 | 137 | 42161 | 8453 });
 			}
 
 			// Send the transaction
@@ -392,7 +392,7 @@ export function useLifiQuote() {
 				value: txData.value ? BigInt(txData.value) : undefined,
 				gas: txData.gasLimit ? BigInt(txData.gasLimit) : undefined,
 				gasPrice: txData.gasPrice ? BigInt(txData.gasPrice) : undefined,
-				chainId: targetChainId,
+				chainId: targetChainId as any,
 			});
 
 			console.log("Transaction sent:", hash);

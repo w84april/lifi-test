@@ -4,13 +4,13 @@ import { useState, useCallback } from "react";
 
 export type VaultType = 'yearnV2' | 'yearnV2NoRecipient' | 'yearnV3' | 'unknown';
 
-// Function selectors for different deposit methods
-const DEPOSIT_SELECTORS = {
-  // deposit(uint256,address) - 0x6e553f65
-  withRecipient: '0x6e553f65',
-  // deposit(uint256) - 0xb6b55f25
-  noRecipient: '0xb6b55f25',
-};
+// Function selectors for different deposit methods (unused)
+// const DEPOSIT_SELECTORS = {
+//   // deposit(uint256,address) - 0x6e553f65
+//   withRecipient: '0x6e553f65',
+//   // deposit(uint256) - 0xb6b55f25
+//   noRecipient: '0xb6b55f25',
+// };
 
 // Minimal ABIs for checking contract methods
 const depositWithRecipientABI = [{

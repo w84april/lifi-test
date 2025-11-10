@@ -2,11 +2,11 @@ import { useState } from 'react'
 import './App.css'
 import YearnDepositForm from './components/YearnDepositForm'
 import StakingDepositForm from './components/StakingDepositForm'
-import TestBridgeForm from './components/TestBridgeForm'
+import YearnWithdrawForm from './components/YearnWithdrawForm'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 
 function App() {
-  const [activeForm, setActiveForm] = useState<'test' | 'yearn' | 'staking'>('test')
+  const [activeForm, setActiveForm] = useState<'yearn' | 'staking' | 'withdraw'>('yearn')
 
   return (
     <div className="app-container">
@@ -16,12 +16,6 @@ function App() {
       </div>
       
       <div className="form-selector">
-        <button 
-          className={`tab-button ${activeForm === 'test' ? 'active' : ''}`}
-          onClick={() => setActiveForm('test')}
-        >
-          Test Bridge
-        </button>
         <button 
           className={`tab-button ${activeForm === 'yearn' ? 'active' : ''}`}
           onClick={() => setActiveForm('yearn')}
@@ -34,12 +28,18 @@ function App() {
         >
           Staking Deposit
         </button>
+        <button 
+          className={`tab-button ${activeForm === 'withdraw' ? 'active' : ''}`}
+          onClick={() => setActiveForm('withdraw')}
+        >
+          Withdraw
+        </button>
       </div>
       
       <div className="form-content">
-        {activeForm === 'test' && <TestBridgeForm />}
         {activeForm === 'yearn' && <YearnDepositForm />}
         {activeForm === 'staking' && <StakingDepositForm />}
+        {activeForm === 'withdraw' && <YearnWithdrawForm />}
       </div>
     </div>
   )

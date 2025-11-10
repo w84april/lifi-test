@@ -1,7 +1,7 @@
 import { createConfig } from "@lifi/sdk";
 import { type FormEvent, useEffect, useState } from "react";
 import "./Forms.css";
-import { type Address, parseEther } from "viem";
+import type { Address } from "viem";
 import { useAccount } from "wagmi";
 import { useLifiQuote } from "../hooks/useLifiQuote";
 import { useTokenApproval } from "../hooks/useTokenApproval";
@@ -9,7 +9,7 @@ import {
 	useVaultTypeDetector,
 	type VaultType,
 } from "../hooks/useVaultTypeDetector";
-import { formatUnits, parseUnits, TOKEN_DECIMALS } from "../utils/tokenHelpers";
+import { parseUnits, TOKEN_DECIMALS } from "../utils/tokenHelpers";
 
 interface FormData {
 	fromChain: string;
@@ -24,7 +24,7 @@ interface FormData {
 
 const YearnDepositForm = () => {
 	const [quote, setQuote] = useState<any>(null);
-	const { address, isConnected, chainId } = useAccount();
+	const { address, isConnected } = useAccount();
 	const { loading, executing, error, fetchQuote, executeQuote } =
 		useLifiQuote();
 	const [detectedVaultType, setDetectedVaultType] = useState<VaultType | null>(
@@ -48,11 +48,9 @@ const YearnDepositForm = () => {
 		depositMethod: "yearnV2",
 	});
 
-	const {
-		detecting,
-		detectVaultType,
-		error: detectError,
-	} = useVaultTypeDetector(parseInt(formData.toChain));
+	const { detecting, detectVaultType } = useVaultTypeDetector(
+		parseInt(formData.toChain),
+	);
 
 	useEffect(() => {
 		if (address) {
@@ -89,7 +87,7 @@ const YearnDepositForm = () => {
 			// Store LiFi contract address from the quote
 			const txData =
 				contractCallsQuote?.transactionRequest ||
-				contractCallsQuote?.estimate?.transactionRequest;
+				(contractCallsQuote as any)?.estimate?.transactionRequest;
 			if (txData?.to) {
 				setLifiContractAddress(txData.to);
 			}
